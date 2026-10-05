@@ -1,0 +1,157 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>مدخراتي</title>
+<link rel="manifest" href="manifest.webmanifest">
+<meta name="theme-color" content="#12263a">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="مدخراتي">
+<link rel="apple-touch-icon" href="icons/icon-192.png">
+<style>
+:root{box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px);
+--bg:#eef2f5;--card:#fff;--ink:#12263a;--mute:#5d7084;--line:#d8e0e7;--in:#17794f;--out:#b23a3a;--acc:#12263a;--accink:#fff}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#0e1822;--card:#16232f;--ink:#e6edf3;--mute:#93a4b5;--line:#27384a;--in:#4cc38a;--out:#ef7f7f;--acc:#e6edf3;--accink:#0e1822}}
+:root[data-theme="dark"]{--bg:#0e1822;--card:#16232f;--ink:#e6edf3;--mute:#93a4b5;--line:#27384a;--in:#4cc38a;--out:#ef7f7f;--acc:#e6edf3;--accink:#0e1822}
+html{scroll-padding-top:env(safe-area-inset-top,0px)}
+*,*::before,*::after{box-sizing:inherit}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:system-ui,"Segoe UI",Tahoma,sans-serif;line-height:1.6}
+main{max-width:860px;margin:0 auto;padding:20px 16px 48px}
+h1{font-size:1.6rem;margin:0 0 4px}
+h2{font-size:1.05rem;margin:0 0 12px}
+.sub{color:var(--mute);margin:0 0 20px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:16px;margin-bottom:16px}
+.grid{display:grid;gap:16px;grid-template-columns:1fr}
+@media(min-width:720px){.grid{grid-template-columns:240px 1fr}}
+.acc{display:flex;justify-content:space-between;align-items:center;width:100%;padding:10px 12px;margin-bottom:8px;border:1px solid var(--line);border-radius:8px;background:transparent;color:var(--ink);font:inherit;cursor:pointer;text-align:start}
+.acc[aria-pressed="true"]{background:var(--acc);color:var(--accink);border-color:var(--acc)}
+.acc b{font-weight:600}
+input,select,button{font:inherit;color:var(--ink)}
+input{width:100%;padding:9px 10px;border:1px solid var(--line);border-radius:8px;background:var(--bg)}
+label{display:block;font-size:.85rem;color:var(--mute);margin-bottom:4px}
+.row{display:grid;gap:10px;grid-template-columns:1fr 1fr}
+.row .full{grid-column:1/-1}
+.btn{padding:10px 14px;border:0;border-radius:8px;cursor:pointer;font-weight:600;background:var(--acc);color:var(--accink)}
+.btn.in{background:var(--in);color:#fff}.btn.out{background:var(--out);color:#fff}
+.btn.ghost{background:transparent;color:var(--mute);border:1px solid var(--line);font-weight:400;padding:4px 8px;font-size:.8rem}
+:focus-visible{outline:3px solid #3b82f6;outline-offset:2px}
+.bal{font-size:2rem;font-weight:700;margin:0}
+.stats{display:flex;gap:24px;flex-wrap:wrap;color:var(--mute);font-size:.9rem}
+.in-t{color:var(--in)}.out-t{color:var(--out)}
+.tw{overflow-x:auto}
+table{width:100%;border-collapse:collapse;font-size:.92rem;min-width:520px}
+th,td{padding:8px 6px;text-align:start;border-bottom:1px solid var(--line);white-space:nowrap}
+th{color:var(--mute);font-weight:600}
+.empty{color:var(--mute);padding:12px 0}
+.err{color:var(--out);min-height:1.4em;margin:8px 0 0;font-size:.9rem}
+.actions{display:flex;gap:10px;margin-top:12px;flex-wrap:wrap}
+</style>
+</head>
+<body>
+<main>
+<h1>مدخراتي</h1>
+<p class="sub">أنشئ حسابات، سجّل الإيداع والسحب، وتابع الرصيد بالتاريخ واليوم.</p>
+<div class="grid">
+<aside>
+ <div class="card">
+  <h2>الحسابات</h2>
+  <div id="accs"></div>
+  <label for="an">اسم حساب جديد</label>
+  <input id="an" placeholder="مثال: حساب الطوارئ">
+  <label for="ab" style="margin-top:8px">رصيد افتتاحي (اختياري)</label>
+  <input id="ab" type="number" min="0" step="any" placeholder="0">
+  <div class="actions"><button class="btn" id="addAcc">إضافة حساب</button></div>
+ </div>
+</aside>
+<section id="main"></section>
+</div>
+</main>
+<script>
+const KEY="savings-v1";
+const DAYS=["الأحد","الاثنين","الثلاثاء","الأربعاء","الخميس","الجمعة","السبت"];
+let S={accounts:[],sel:null};
+try{const r=localStorage.getItem(KEY);if(r)S=JSON.parse(r)}catch(e){}
+const save=()=>{try{localStorage.setItem(KEY,JSON.stringify(S))}catch(e){}};
+const $=id=>document.getElementById(id);
+const fmt=n=>Number(n).toLocaleString("ar-EG",{minimumFractionDigits:0,maximumFractionDigits:2});
+const today=()=>{const d=new Date();return d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")+"-"+String(d.getDate()).padStart(2,"0")};
+const dayOf=s=>DAYS[new Date(s+"T12:00:00").getDay()];
+const bal=a=>a.tx.reduce((s,t)=>s+(t.type==="in"?t.amt:-t.amt),0);
+const esc=s=>String(s).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const uid=()=>Date.now().toString(36)+Math.random().toString(36).slice(2,6);
+
+function addTx(a,type,amt,date,note){a.tx.push({id:uid(),type,amt,date,note})}
+
+$("addAcc").onclick=()=>{
+ const n=$("an").value.trim();if(!n){$("an").focus();return}
+ const a={id:uid(),name:n,tx:[]};
+ const o=parseFloat($("ab").value);
+ if(o>0)addTx(a,"in",o,today(),"رصيد افتتاحي");
+ S.accounts.push(a);S.sel=a.id;$("an").value="";$("ab").value="";save();render();
+};
+
+function render(){
+ const box=$("accs");
+ box.innerHTML=S.accounts.length?"":'<p class="empty">لا توجد حسابات بعد. أضف أول حساب.</p>';
+ S.accounts.forEach(a=>{
+  const b=document.createElement("button");b.className="acc";b.setAttribute("aria-pressed",a.id===S.sel);
+  b.innerHTML="<b>"+esc(a.name)+"</b><span>"+fmt(bal(a))+"</span>";
+  b.onclick=()=>{S.sel=a.id;save();render()};box.appendChild(b);
+ });
+ const a=S.accounts.find(x=>x.id===S.sel);
+ const m=$("main");
+ if(!a){m.innerHTML='<div class="card"><p class="empty">اختر حسابًا أو أنشئ واحدًا لبدء التسجيل.</p></div>';return}
+ const tin=a.tx.filter(t=>t.type==="in").reduce((s,t)=>s+t.amt,0);
+ const tout=a.tx.filter(t=>t.type==="out").reduce((s,t)=>s+t.amt,0);
+ m.innerHTML=`
+ <div class="card">
+  <h2>${esc(a.name)}</h2>
+  <p class="bal">${fmt(bal(a))}</p>
+  <div class="stats"><span>إجمالي الإيداع: <b class="in-t">${fmt(tin)}</b></span><span>إجمالي السحب: <b class="out-t">${fmt(tout)}</b></span></div>
+ </div>
+ <div class="card">
+  <h2>عملية جديدة</h2>
+  <div class="row">
+   <div><label for="amt">المبلغ</label><input id="amt" type="number" min="0" step="any" inputmode="decimal"></div>
+   <div><label for="dt">التاريخ <span id="dn"></span></label><input id="dt" type="date" value="${today()}"></div>
+   <div class="full"><label for="nt">ملاحظة (اختياري)</label><input id="nt"></div>
+  </div>
+  <div class="actions"><button class="btn in" id="dep">إيداع</button><button class="btn out" id="wd">سحب</button></div>
+  <p class="err" id="err" role="alert"></p>
+ </div>
+ <div class="card">
+  <h2>سجل العمليات</h2>
+  <div class="tw" id="tbl"></div>
+  <div class="actions"><button class="btn ghost" id="delAcc">حذف الحساب</button></div>
+ </div>`;
+ const upd=()=>{$("dn").textContent=$("dt").value?"("+dayOf($("dt").value)+")":""};
+ $("dt").oninput=upd;upd();
+ const go=type=>{
+  const v=parseFloat($("amt").value),d=$("dt").value;
+  if(!(v>0)){$("err").textContent="أدخل مبلغًا أكبر من صفر.";return}
+  if(!d){$("err").textContent="اختر التاريخ.";return}
+  if(type==="out"&&v>bal(a)){$("err").textContent="المبلغ أكبر من الرصيد المتاح ("+fmt(bal(a))+").";return}
+  addTx(a,type,v,d,$("nt").value.trim());save();render();
+ };
+ $("dep").onclick=()=>go("in");$("wd").onclick=()=>go("out");
+ $("delAcc").onclick=()=>{if(confirm("حذف حساب «"+a.name+"» وكل عملياته؟")){S.accounts=S.accounts.filter(x=>x.id!==a.id);S.sel=S.accounts[0]?.id||null;save();render()}};
+ // running balance in chronological order, display newest first
+ const sorted=a.tx.map((t,i)=>({...t,i})).sort((x,y)=>x.date.localeCompare(y.date)||x.i-y.i);
+ let run=0;sorted.forEach(t=>{run+=t.type==="in"?t.amt:-t.amt;t.run=run});
+ sorted.reverse();
+ $("tbl").innerHTML=sorted.length?`<table><thead><tr><th>التاريخ</th><th>اليوم</th><th>النوع</th><th>المبلغ</th><th>الرصيد بعدها</th><th>ملاحظة</th><th></th></tr></thead><tbody>`+
+  sorted.map(t=>`<tr><td>${t.date}</td><td>${dayOf(t.date)}</td><td class="${t.type==="in"?"in-t":"out-t"}">${t.type==="in"?"إيداع":"سحب"}</td><td class="${t.type==="in"?"in-t":"out-t"}">${t.type==="in"?"+":"−"}${fmt(t.amt)}</td><td>${fmt(t.run)}</td><td>${esc(t.note||"")}</td><td><button class="btn ghost" data-d="${t.id}" aria-label="حذف العملية">حذف</button></td></tr>`).join("")+`</tbody></table>`:'<p class="empty">لا توجد عمليات بعد.</p>';
+ document.querySelectorAll("[data-d]").forEach(b=>b.onclick=()=>{
+  const id=b.dataset.d;const t=a.tx.find(x=>x.id===id);
+  const test=a.tx.filter(x=>x.id!==id);const nb=test.reduce((s,x)=>s+(x.type==="in"?x.amt:-x.amt),0);
+  if(nb<0&&!confirm("حذف هذه العملية سيجعل الرصيد سالبًا. متابعة؟"))return;
+  a.tx=test;save();render();
+ });
+}
+render();
+if("serviceWorker" in navigator){window.addEventListener("load",()=>{navigator.serviceWorker.register("sw.js").catch(()=>{})})}
+</script>
+</body>
+</html>
